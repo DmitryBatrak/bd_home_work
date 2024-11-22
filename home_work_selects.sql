@@ -1,5 +1,5 @@
 -- Задание 2
-SELECT name_of_track AS "Назвние трека", MAX(duration) AS "Продолжительность"
+SELECT name_of_track AS "Назвние трека", duration AS "Продолжительность"
   FROM music_tracks
  GROUP BY  name_of_track, duration
  LIMIT 1;
@@ -18,19 +18,18 @@ SELECT nickname AS "Исполнитель"
  
 SELECT name_of_track AS "Назвние трека"
   FROM music_tracks
- WHERE name_of_track LIKE '%my%'
+ WHERE name_of_track ~* '\mmy\M'
  
  -- Задание3
- SELECT genre_name AS "Жанр", COUNT(*) AS "Количество"
-   FROM generes_of_music
-   JOIN genre_and_performens ON generes_of_music.id = genre_and_performens.genre_names
-  GROUP BY genre_name;
+SELECT genre_name AS "Жанр", COUNT(*) AS "Количество"
+  FROM generes_of_music
+  JOIN genre_and_performens ON generes_of_music.id = genre_and_performens.genre_names
+ GROUP BY genre_name;
   
- SELECT album_name AS "Альбом", COUNT(*) AS "Количество", year_of_issue AS "Год"
-   FROM list_of_albums
-   JOIN music_tracks ON list_of_albums.album_name = music_tracks.albums_names
-  WHERE year_of_issue BETWEEN 2019 AND 2020
-  GROUP BY album_name, year_of_issue;
+SELECT COUNT(*) AS "Количество"
+  FROM list_of_albums
+  JOIN music_tracks ON list_of_albums.album_name = music_tracks.albums_names
+ WHERE year_of_issue BETWEEN 2019 AND 2020
  
 SELECT albums_names AS "Название альбома", AVG(duration) AS "Средняя продолжительность"
   FROM music_tracks
@@ -38,9 +37,13 @@ SELECT albums_names AS "Название альбома", AVG(duration) AS "Ср
 
 SELECT nickname AS "Исполнитель"
   FROM music_performers
-  JOIN albums_and_performers ON music_performers.id = albums_and_performers.nick_name 
-  JOIN list_of_albums ON albums_and_performers.albums_name = list_of_albums.id
- WHERE year_of_issue != 2020;
+ WHERE nickname NOT IN (
+	SELECT nickname
+	  FROM music_performers
+      JOIN albums_and_performers ON music_performers.id = albums_and_performers.nick_name 
+      JOIN list_of_albums ON albums_and_performers.albums_name = list_of_albums.id
+     WHERE year_of_issue = 2020
+);
 
 SELECT collection_name AS "Сборник"
   FROM collections

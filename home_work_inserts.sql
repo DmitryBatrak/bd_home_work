@@ -16,14 +16,14 @@ VALUES (1, 2013, 'Watching Movies with the Sound Off'),
        (4, 2003, 'In the Zone');
       
 INSERT INTO music_tracks 
-VALUES (1, 'Watching Movies with the Sound Off', 302, 'I Am Who Am'),
-       (2, 'Watching Movies with the Sound Off', 360, 'Red Dot Music'),
-       (3, 'Oxymoron', 267, 'What They Want'),
-       (4, 'Oxymoron', 163, 'Man of the Year'),
-       (5, 'No More Tears', 260, 'Time After Time'),
-       (6, 'No More Tears', 253, 'A.V.H.'),
-       (7, 'In the Zone', 164, 'Showdown my'),
-       (8, 'In the Zone', 140, 'Toxic');
+VALUES (1, 'Watching Movies with the Sound Off', 302, 'myself'),
+       (2, 'Watching Movies with the Sound Off', 360, 'by myself'),
+       (3, 'Oxymoron', 267, 'bemy self'),
+       (4, 'Oxymoron', 163, 'premyne'),
+       (5, 'No More Tears', 260, 'my own'),
+       (6, 'No More Tears', 253, 'own my'),
+       (7, 'In the Zone', 164, 'oh my god'),
+       (8, 'In the Zone', 140, 'my');
 	  
 INSERT INTO collections 
 VALUES (1, 2000, 'Top of 90-th'),
