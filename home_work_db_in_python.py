@@ -9,6 +9,16 @@ data_base = os.getenv("data_base")
 user = os.getenv("user")
 password = os.getenv("password")
 
+def error_handling(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except psycopg2.DatabaseError as err:
+            print(f"Error: {err}")
+            if self.conn:
+                self.conn.rollback()
+    return wrapper
+
 class ClientManagement:
     def __init__(self, *, data_base: str, user: str, password: str) -> None:
         self.data_base = data_base
@@ -18,156 +28,127 @@ class ClientManagement:
         self.cursor = self.conn.cursor()
 
 
-    def create_data_base(self) -> None:
-        try:
-            with self.conn:
-                self.cursor.execute("""
+    @error_handling
+    def create_data_base(self):
+        with self.conn:
+            self.cursor.execute("""
                     DROP TABLE IF EXISTS client_first_name, client_last_name, email_address, telephone_number;
 
                     CREATE TABLE IF NOT EXISTS client_first_name (
                         id SERIAL PRIMARY KEY,
-                        first_name TEXT NOT NULL
-                        );
-
-                    CREATE TABLE IF NOT EXISTS client_last_name (
-                        id INTEGER PRIMARY KEY REFERENCES client_first_name(id),
-                        last_name TEXT NOT NULL
-                        );
-
-                    CREATE TABLE IF NOT EXISTS email_address (
-                        id INTEGER PRIMARY KEY REFERENCES client_first_name(id),
+                        first_name TEXT NOT NULL,
+                        last_name TEXT NOT NULL,
                         email TEXT NOT NULL UNIQUE
-                        );
+                    );
 
                     CREATE TABLE IF NOT EXISTS telephone_number (
                         id SERIAL PRIMARY KEY,
                         client_id INTEGER NOT NULL REFERENCES client_first_name(id),
-                        telephone INTEGER UNIQUE
-                        );
+                        telephone BIGINT UNIQUE
+                    );
                 """)
-                self.conn.commit()
-        except psycopg2.DatabaseError as err:
-            print(f"Error: {err}")
-            self.conn.rollback()
+            self.conn.commit()
 
-
+    @error_handling
     def add_new_client(self, *, first_name_client: str, last_name_client: str, email: str, telephone=None) -> None:
-        try:
-            with self.conn:
-                self.cursor.execute("""
-                    INSERT INTO client_first_name(first_name) VALUES (%s) RETURNING id;
-                """, (first_name_client,))
-                client_id = self.cursor.fetchone()[0]
+        with self.conn:
+            self.cursor.execute("""
+                INSERT INTO client_first_name(first_name, last_name, email)  VALUES (%s, %s, %s) RETURNING id;
+            """, (first_name_client, last_name_client, email))
+            client_id = self.cursor.fetchone()[0]
 
-                self.cursor.execute("""
-                    INSERT INTO client_last_name(id, last_name) VALUES (%s, %s);
-                """, (client_id, last_name_client))
-
-                self.cursor.execute("""
-                    INSERT INTO email_address(id, email) VALUES (%s, %s);
-                """, (client_id, email))
-
-                if telephone:
-                    self.cursor.execute("""
-                        INSERT INTO telephone_number(client_id, telephone) VALUES (%s, %s);
-                    """, (client_id, telephone))
-
-                self.conn.commit()
-        except psycopg2.DatabaseError as err:
-            print(f"Error: {err}")
-            self.conn.rollback()
-
-
-    def add_telephone(self, *, client_id: int, telephone: int) -> None:
-        try:
-            with self.conn:
+            if telephone:
                 self.cursor.execute("""
                     INSERT INTO telephone_number(client_id, telephone) VALUES (%s, %s);
                 """, (client_id, telephone))
 
-                self.conn.commit()
-        except psycopg2.DatabaseError as err:
-            print(f"Error: {err}")
-            self.conn.rollback()
+            self.conn.commit()
+
+    @error_handling
+    def add_telephone(self, *, client_id: int, telephone: int) -> None:
+        with self.conn:
+            self.cursor.execute("""
+                INSERT INTO telephone_number(client_id, telephone) VALUES (%s, %s);
+            """, (client_id, telephone))
+
+            self.conn.commit()
 
 
+    @error_handling
     def refresh(self, *, client_id: int, first_name_client=None, last_name_client=None, email=None, old_telephone=None,
                 new_telephone=None) -> None:
-        try:
-            with self.conn:
-                if first_name_client:
-                    self.cursor.execute("""
-                        UPDATE first_name_client SET first_name = %s WHERE id = %s;
-                    """, (first_name_client, client_id))
+        with self.conn:
+            if first_name_client:
+                self.cursor.execute("""
+                    UPDATE client_first_name SET first_name = %s WHERE id = %s;
+                """, (first_name_client, client_id))
 
-                if last_name_client:
-                    self.cursor.execute("""
-                        UPDATE client_last_name SET last_name = %s WHERE id = %s;
-                    """, (last_name_client, client_id))
+            if last_name_client:
+                self.cursor.execute("""
+                    UPDATE client_first_name SET last_name = %s WHERE id = %s;
+                """, (last_name_client, client_id))
 
-                if email:
-                    self.cursor.execute("""
-                        UPDATE email_address SET email = %s WHERE id = %s;
-                    """, (email, client_id))
+            if email:
+                self.cursor.execute("""
+                    UPDATE client_first_name SET email = %s WHERE id = %s;
+                """, (email, client_id))
 
-                if old_telephone and new_telephone:
-                    self.cursor.execute("""
-                        UPDATE telephone_number SET telephone = %s WHERE client_id = %s AND telephone = %s;
-                    """, (new_telephone, client_id, old_telephone))
+            if old_telephone and new_telephone:
+                self.cursor.execute("""
+                    UPDATE telephone_number SET telephone = %s WHERE client_id = %s AND telephone = %s;
+                """, (new_telephone, client_id, old_telephone))
 
-                self.conn.commit()
-        except psycopg2.DatabaseError as err:
-            print(f"Error: {err}")
-            self.conn.rollback()
+            self.conn.commit()
 
 
+    @error_handling
     def delete_telephone(self, *, telephone_for_delete: int) -> None:
-        try:
-            with self.conn:
-                self.cursor.execute("""
-                    DELETE FROM telephone_number WHERE telephone = %s;
-                """, (telephone_for_delete, ))
+        with self.conn:
+            self.cursor.execute("""
+                DELETE FROM telephone_number WHERE telephone = %s;
+            """, (telephone_for_delete, ))
 
-            self.conn.commit()
-        except psycopg2.DatabaseError as err:
-            print(f"Error: {err}")
-            self.conn.rollback()
+        self.conn.commit()
 
 
+    @error_handling
     def delete_client(self, *, client_id: int) -> None:
-        try:
-            with self.conn:
-                self.cursor.execute("""
-                    DELETE FROM telephone_number WHERE client_id = %s;
-                    DELETE FROM email_address WHERE id = %s;
-                    DELETE FROM client_last_name WHERE id = %s;
-                    DELETE FROM client_first_name WHERE id = %s;
-                """, (client_id, client_id, client_id, client_id))
+        with self.conn:
+            self.cursor.execute("""
+                DELETE FROM client_first_name WHERE id = %s;
+            """, (client_id, ))
 
-            self.conn.commit()
-        except psycopg2.DatabaseError as err:
-            print(f"Error: {err}")
-            self.conn.rollback()
+        self.conn.commit()
 
 
+    @error_handling
     def find_client(self, *, first_name_client=None, last_name_client=None, email=None, telephone=None) -> list:
-        try:
-            with self.conn:
-                self.cursor.execute("""
-                    SELECT first_name, last_name, email, telephone
-                      FROM client_first_name
-                      JOIN client_last_name ON client_first_name.id = client_last_name.id
-                      JOIN email_address ON client_first_name.id = email_address.id
-                      JOIN telephone_number ON client_first_name.id = telephone_number.client_id
-                     WHERE first_name = %s OR last_name = %s OR email = %s OR telephone = %s;
-                """, (first_name_client, last_name_client, email, telephone))
+        base_query = """
+                SELECT first_name, last_name, email, telephone
+                  FROM client_first_name
+                  JOIN telephone_number ON client_first_name.id = telephone_number.client_id
+                  """
 
-                search_result = self.cursor.fetchall()
-                return search_result
+        if email:
+            base_query += f"WHERE email = %s"
+            final_query = (base_query, email)
+        elif telephone:
+            base_query += f"WHERE telephone = %s"
+            final_query = (base_query, telephone)
+        elif first_name_client and last_name_client:
+            base_query += f"WHERE first_name = %s AND last_name = %s"
+            final_query = (base_query, first_name_client, last_name_client)
+        elif last_name_client:
+            base_query += f"WHERE last_name = %s"
+            final_query = (base_query, last_name_client)
+        elif first_name_client:
+            base_query += f"WHERE first_name = %s"
+            final_query = (base_query, first_name_client)
 
-        except psycopg2.DatabaseError as err:
-            print(f"Error: {err}")
-            self.conn.rollback()
+        with self.conn:
+            self.cursor.execute(final_query[0], (final_query[1], ))
+            search_result = self.cursor.fetchall()
+            return search_result
 
 
     def close_connection(self) -> None:
@@ -175,16 +156,17 @@ class ClientManagement:
         self.conn.close()
 
 
-Manager = ClientManagement(data_base=data_base, user=user, password=password)
-Manager.create_data_base()
-Manager.add_new_client(first_name_client="Дмитрий", last_name_client="Батрак", email="dmitry@gmail.com")
-Manager.add_new_client(first_name_client="Юлия", last_name_client="Ковалевская", email="julia@gmail.com")
-Manager.add_new_client(first_name_client="Кот", last_name_client="Барсик", email="cat@gmail.com", telephone=765432107)
-Manager.add_telephone(client_id=2, telephone=766655544)
-Manager.add_telephone(client_id=2, telephone=733322211)
-Manager.add_telephone(client_id=2, telephone=799988877)
-Manager.refresh(client_id=2, last_name_client="Батрак", old_telephone=766655544, new_telephone=711122233)
-Manager.delete_telephone(telephone_for_delete=733322211)
-Manager.delete_client(client_id=1)
-print(Manager.find_client(last_name_client="Батрак"))
-Manager.close_connection()
+if __name__ == "__main__":
+    Manager = ClientManagement(data_base=data_base, user=user, password=password)
+    Manager.create_data_base()
+    Manager.add_new_client(first_name_client="Дмитрий", last_name_client="Батрак", email="dmitry@gmail.com")
+    Manager.add_new_client(first_name_client="Юлия", last_name_client="Ковалевская", email="julia@gmail.com")
+    Manager.add_new_client(first_name_client="Кот", last_name_client="Барсик", email="cat@gmail.com", telephone=765432107)
+    Manager.add_telephone(client_id=2, telephone=766655544)
+    Manager.add_telephone(client_id=2, telephone=733322211)
+    Manager.add_telephone(client_id=2, telephone=799988877)
+    Manager.refresh(client_id=2, last_name_client="Батрак", old_telephone=766655544, new_telephone=711122233)
+    Manager.delete_telephone(telephone_for_delete=733322211)
+    Manager.delete_client(client_id=1)
+    print(Manager.find_client(last_name_client="Батрак"))
+    Manager.close_connection()
